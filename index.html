@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Noughts &amp; Crosses</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single centered play sheet on graph paper — scoreboard, board, controls stacked */
+:root {
+  --paper: #eef2f6;
+  --grid: #d6dfe9;
+  --ink: #18222e;
+  --muted: #5d6b7b;
+  --x: #2f5bd3;
+  --o: #d2432f;
+  --card: #ffffff;
+  --line: #c3cfdc;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121821; --grid: #1c2531; --ink: #e7edf4; --muted: #8e9cad;
+    --x: #7ea0ff; --o: #ff7d68; --card: #19212c; --line: #2c3848; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121821; --grid: #1c2531; --ink: #e7edf4; --muted: #8e9cad;
+  --x: #7ea0ff; --o: #ff7d68; --card: #19212c; --line: #2c3848; color-scheme: dark;
+}
+html, body { min-height: 100%; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font-family: var(--mono);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px;
+}
+.sheet {
+  max-width: 440px; margin: 0 auto;
+  display: grid; gap: 20px;
+}
+h1 {
+  font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 8vw, 2.75rem);
+  line-height: 1; margin: 0; letter-spacing: -0.02em; text-wrap: balance;
+}
+h1 .x { color: var(--x); } h1 .o { color: var(--o); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; overflow: hidden; background: var(--card); }
+.seg button {
+  font: 500 0.8rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 8px 14px; border: 0; background: transparent; color: var(--ink); cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.seg button:focus-visible, .cell:focus-visible, .primary:focus-visible { outline: 3px solid var(--x); outline-offset: 2px; }
+
+.score {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; text-align: center;
+  border-block: 1.5px solid var(--ink);
+}
+.score div { padding: 10px 4px; display: grid; gap: 2px; }
+.score div + div { border-left: 1px dashed var(--line); }
+.score .lbl { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.score .num { font-family: var(--display); font-weight: 800; font-size: 1.75rem; font-variant-numeric: tabular-nums; }
+.score .px .num { color: var(--x); } .score .po .num { color: var(--o); }
+.score .turn { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+
+.status { font-size: 0.95rem; min-height: 1.4em; margin: 0; }
+.status b { font-weight: 500; }
+
+.board-wrap { position: relative; width: 100%; max-width: 100%; aspect-ratio: 1; }
+.board {
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  width: 100%; height: 100%;
+}
+.cell {
+  border: 0; background: transparent; padding: 12%; cursor: pointer; color: inherit;
+  border-color: var(--ink); border-style: solid; border-width: 0;
+}
+.cell:nth-child(-n+6) { border-bottom-width: 3px; }
+.cell:not(:nth-child(3n)) { border-right-width: 3px; }
+.cell:disabled { cursor: default; }
+.cell svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cell svg path, .cell svg circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+.cell .mx { stroke: var(--x); } .cell .mo { stroke: var(--o); }
+.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ink 0.28s ease-out forwards; }
+.draw.d2 { animation-delay: 0.14s; }
+@keyframes ink { to { stroke-dashoffset: 0; } }
+.cell.ghost:hover:not(:disabled) svg { opacity: 0.18; }
+.board.over .cell:not(.win) svg { opacity: 0.3; transition: opacity 0.3s; }
+
+.strike { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.strike line { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: ink 0.4s 0.25s ease-out forwards; }
+
+.foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.primary {
+  font: 800 1rem var(--display); padding: 12px 22px; border-radius: 999px; cursor: pointer;
+  background: var(--ink); color: var(--paper); border: 0;
+}
+.link { font: 0.8rem var(--mono); background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; }
+.hint { font-size: 0.75rem; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .draw, .strike line { animation: none; stroke-dashoffset: 0; }
+}
+</style>
+</head>
+<body>
+
+<main class="sheet">
+  <h1>Noughts <span class="x">&amp;</span> Cr<span class="o">o</span>sses</h1>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Opponent">
+      <button id="m-cpu" data-mode="cpu">vs Computer</button>
+      <button id="m-pvp" data-mode="pvp">2 Players</button>
+    </div>
+    <div class="seg" role="group" aria-label="Difficulty" id="diff">
+      <button id="d-easy" data-diff="easy">Easy</button>
+      <button id="d-medium" data-diff="medium">Medium</button>
+      <button id="d-hard" data-diff="hard">Unbeatable</button>
+    </div>
+  </div>
+
+  <div class="score" aria-live="polite">
+    <div class="px"><span class="lbl" id="lx">You · X</span><span class="num" id="sx">0</span></div>
+    <div class="pd"><span class="lbl">Draws</span><span class="num" id="sd">0</span></div>
+    <div class="po"><span class="lbl" id="lo">CPU · O</span><span class="num" id="so">0</span></div>
+  </div>
+
+  <p class="status" id="status" aria-live="polite"></p>
+
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Tic-tac-toe board"></div>
+    <svg class="strike" id="strike" viewBox="0 0 30 30" aria-hidden="true"></svg>
+  </div>
+
+  <div class="foot">
+    <button class="primary" id="again">New round</button>
+    <button class="link" id="reset">Reset score</button>
+  </div>
+  <p class="hint">Keys 1–9 play a square (top-left is 1). Starting player alternates each round.</p>
+</main>
+
+<script>
+(() => {
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  const $ = id => document.getElementById(id);
+  const boardEl = $("board"), strikeEl = $("strike"), statusEl = $("status");
+  let S;
+
+  const fresh = () => ({ mode: "cpu", diff: "hard", score: { X: 0, O: 0, D: 0 }, starter: "X", board: Array(9).fill(null), turn: "X", result: null });
+
+  function winner(b) {
+    for (const l of LINES) { const [a, c, d] = l; if (b[a] && b[a] === b[c] && b[a] === b[d]) return { who: b[a], line: l }; }
+    return b.every(Boolean) ? { who: "D" } : null;
+  }
+
+  function minimax(b, p, depth) {
+    const w = winner(b);
+    if (w) return { s: w.who === "O" ? 10 - depth : w.who === "X" ? depth - 10 : 0 };
+    let best = { s: p === "O" ? -Infinity : Infinity };
+    for (let i = 0; i < 9; i++) if (!b[i]) {
+      b[i] = p; const r = minimax(b, p === "O" ? "X" : "O", depth + 1); b[i] = null;
+      if (p === "O" ? r.s > best.s : r.s < best.s) best = { s: r.s, i };
+    }
+    return best;
+  }
+
+  function cpuMove() {
+    const open = S.board.map((v, i) => v ? -1 : i).filter(i => i >= 0);
+    if (S.diff === "easy" && Math.random() < 0.6) return open[Math.floor(Math.random() * open.length)];
+    if (S.diff === "medium") {
+      // Takes a win, blocks yours, otherwise grabs the center or a random square. Forks beat it.
+      for (const p of ["O", "X"]) for (const i of open) {
+        const b = S.board.slice(); b[i] = p;
+        if (winner(b)?.who === p) return i;
+      }
+      if (!S.board[4] && Math.random() < 0.7) return 4;
+      return open[Math.floor(Math.random() * open.length)];
+    }
+    if (open.length === 9) return [0, 2, 4, 6, 8][Math.floor(Math.random() * 5)];
+    return minimax(S.board.slice(), "O", 0).i;
+  }
+
+  const markSVG = (p, animate) => {
+    const c = animate ? "draw" : "";
+    return p === "X"
+      ? `<svg viewBox="0 0 100 100" aria-hidden="true"><path class="mx ${c}" pathLength="1" d="M14 14 L86 86"/><path class="mx ${c} d2" pathLength="1" d="M86 14 L14 86"/></svg>`
+      : `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="mo ${c}" pathLength="1" cx="50" cy="50" r="38" transform="rotate(-90 50 50)"/></svg>`;
+  };
+
+  function play(i) {
+    if (S.result || S.board[i]) return;
+    if (S.mode === "cpu" && S.turn === "O") return;
+    place(i);
+    if (!S.result && S.mode === "cpu" && S.turn === "O") setTimeout(() => { if (S.turn === "O" && !S.result) place(cpuMove()); }, 380);
+  }
+
+  function place(i) {
+    S.board[i] = S.turn;
+    const w = winner(S.board);
+    if (w) { S.result = w; S.score[w.who]++; }
+    else S.turn = S.turn === "X" ? "O" : "X";
+    render(i);
+  }
+
+  function newRound() {
+    S.starter = S.starter === "X" ? "O" : "X";
+    S.board = Array(9).fill(null); S.turn = S.starter; S.result = null;
+    render();
+    if (S.mode === "cpu" && S.turn === "O") setTimeout(() => place(cpuMove()), 450);
+  }
+
+  function name(p) {
+    if (S.mode === "pvp") return `Player ${p}`;
+    return p === "X" ? "You" : "Computer";
+  }
+
+  function render(justPlayed) {
+    boardEl.classList.toggle("over", !!S.result);
+    boardEl.innerHTML = "";
+    S.board.forEach((v, i) => {
+      const b = document.createElement("button");
+      b.className = "cell";
+      b.id = "cell-" + i;
+      b.setAttribute("aria-label", `Square ${i + 1}, ${v || "empty"}`);
+      const cpuTurn = S.mode === "cpu" && S.turn === "O";
+      b.disabled = !!v || !!S.result || cpuTurn;
+      if (v) b.innerHTML = markSVG(v, i === justPlayed);
+      else if (!b.disabled) { b.classList.add("ghost"); b.innerHTML = markSVG(S.turn, false).replace("<svg", '<svg style="opacity:0"'); }
+      if (S.result && S.result.line && S.result.line.includes(i)) b.classList.add("win");
+      b.addEventListener("click", () => play(i));
+      boardEl.appendChild(b);
+    });
+    boardEl.querySelectorAll(".ghost svg").forEach(s => s.removeAttribute("style"));
+    boardEl.querySelectorAll(".ghost svg").forEach(s => s.style.opacity = "0");
+    boardEl.querySelectorAll(".ghost").forEach(c => {
+      c.addEventListener("mouseenter", () => c.querySelector("svg").style.opacity = "0.18");
+      c.addEventListener("mouseleave", () => c.querySelector("svg").style.opacity = "0");
+    });
+
+    strikeEl.innerHTML = "";
+    if (S.result && S.result.line) {
+      const pt = k => [5 + (k % 3) * 10, 5 + Math.floor(k / 3) * 10];
+      const [a, , c] = S.result.line, [x1, y1] = pt(a), [x2, y2] = pt(c);
+      const dx = Math.sign(x2 - x1) * 3.5, dy = Math.sign(y2 - y1) * 3.5;
+      strikeEl.innerHTML = `<line pathLength="1" x1="${x1 - dx}" y1="${y1 - dy}" x2="${x2 + dx}" y2="${y2 + dy}"/>`;
+    }
+
+    const r = S.result;
+    if (r) statusEl.innerHTML = r.who === "D" ? "Cat's game. Nobody wins this one." :
+      (S.mode === "cpu" && r.who === "O" ? "<b>Computer</b> wins. Try again?" : `<b>${name(r.who)}</b> win${S.mode === "cpu" ? "" : "s"}!`);
+    else statusEl.innerHTML = S.mode === "cpu"
+      ? (S.turn === "X" ? "Your move. You are <b>X</b>." : "Computer is thinking…")
+      : `<b>Player ${S.turn}</b> to move.`;
+
+    $("sx").textContent = S.score.X; $("so").textContent = S.score.O; $("sd").textContent = S.score.D;
+    $("lx").textContent = S.mode === "cpu" ? "You · X" : "Player X";
+    $("lo").textContent = S.mode === "cpu" ? "CPU · O" : "Player O";
+    document.querySelector(".px").classList.toggle("turn", !r && S.turn === "X");
+    document.querySelector(".po").classList.toggle("turn", !r && S.turn === "O");
+
+    document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === S.mode));
+    document.querySelectorAll("[data-diff]").forEach(b => b.setAttribute("aria-pressed", b.dataset.diff === S.diff));
+    $("diff").hidden = S.mode !== "cpu";
+    $("again").textContent = r ? "Play again" : "New round";
+  }
+
+  function start(data) {
+    S = Object.assign(fresh(), data && data.S ? data.S : {});
+    document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => {
+      if (S.mode === b.dataset.mode) return;
+      S.mode = b.dataset.mode; S.score = { X: 0, O: 0, D: 0 }; S.starter = "O"; newRound();
+    }));
+    document.querySelectorAll("[data-diff]").forEach(b => b.addEventListener("click", () => {
+      if (S.diff === b.dataset.diff) return;
+      S.diff = b.dataset.diff; S.score = { X: 0, O: 0, D: 0 }; S.starter = "O"; newRound();
+    }));
+    $("again").addEventListener("click", newRound);
+    $("reset").addEventListener("click", () => { S.score = { X: 0, O: 0, D: 0 }; render(); });
+    document.addEventListener("keydown", e => {
+      if (e.key >= "1" && e.key <= "9" && !e.ctrlKey && !e.metaKey && !e.altKey) play(+e.key - 1);
+      else if ((e.key === "n" || e.key === "N") && S.result) newRound();
+    });
+    render();
+    if (S.mode === "cpu" && S.turn === "O" && !S.result) setTimeout(() => place(cpuMove()), 450);
+  }
+
+  window.claude?.hot?.snapshot?.(() => ({ S }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
