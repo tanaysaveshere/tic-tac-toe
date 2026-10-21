@@ -97,6 +97,7 @@ h1 .x { color: var(--x); } h1 .o { color: var(--o); }
 .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ink 0.28s ease-out forwards; }
 .draw.d2 { animation-delay: 0.14s; }
 @keyframes ink { to { stroke-dashoffset: 0; } }
+.cell.ghost svg { opacity: 0; }
 .cell.ghost:hover:not(:disabled) svg { opacity: 0.18; }
 .board.over .cell:not(.win) svg { opacity: 0.3; transition: opacity 0.3s; }
 
@@ -239,16 +240,10 @@ h1 .x { color: var(--x); } h1 .o { color: var(--o); }
       const cpuTurn = S.mode === "cpu" && S.turn === "O";
       b.disabled = !!v || !!S.result || cpuTurn;
       if (v) b.innerHTML = markSVG(v, i === justPlayed);
-      else if (!b.disabled) { b.classList.add("ghost"); b.innerHTML = markSVG(S.turn, false).replace("<svg", '<svg style="opacity:0"'); }
+      else if (!b.disabled) { b.classList.add("ghost"); b.innerHTML = markSVG(S.turn, false); }
       if (S.result && S.result.line && S.result.line.includes(i)) b.classList.add("win");
       b.addEventListener("click", () => play(i));
       boardEl.appendChild(b);
-    });
-    boardEl.querySelectorAll(".ghost svg").forEach(s => s.removeAttribute("style"));
-    boardEl.querySelectorAll(".ghost svg").forEach(s => s.style.opacity = "0");
-    boardEl.querySelectorAll(".ghost").forEach(c => {
-      c.addEventListener("mouseenter", () => c.querySelector("svg").style.opacity = "0.18");
-      c.addEventListener("mouseleave", () => c.querySelector("svg").style.opacity = "0");
     });
 
     strikeEl.innerHTML = "";
